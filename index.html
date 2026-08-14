@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bounce The Ball</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; font-family: sans-serif; }
+
+        .player {
+            width: 100px;
+            height: 20px;
+            background: cyan;
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: width 0.2s;
+        }
+
+        .ball {
+            width: 20px;
+            height: 20px;
+            background: red; /* Default BEFORE score 20 */
+            border-radius: 50%;
+            position: absolute;
+        }
+
+        #score {
+            color: white;
+            font-size: 24px;
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+<div id="player" class="player"></div>
+<div id="score">Score: 0</div>
+
+<script>
+    const player = document.getElementById("player");
+    const scoreText = document.getElementById("score");
+
+    let score = 0;
+    let balls = [];
+    let playerWidth = 100;
+    let playerX = window.innerWidth / 2;
+
+    let shieldActive = false;
+    let ballSpeedMultiplier = 1;
+
+    document.addEventListener("mousemove", (e) => {
+        playerX = e.clientX;
+        player.style.left = playerX + "px";
+    });
+
+    // ----------------------------------------------------
+    // BALL TYPES + COLORS + POWERUP EFFECTS
+    // ----------------------------------------------------
+    const ballTypes = [
+        { color: "green", effect: "bigPaddle" },
+        { color: "blue", effect: "slowBalls" },
+        { color: "yellow", effect: "extraBall" },
+        { color: "purple", effect: "shield" }
+    ];
+
+    function createBall(forceType = null) {
+        const ball = {
+            x: Math.random() * (window.innerWidth - 20),
+            y: 0,
+            speedX: (Math.random() - 0.5) * 4,
+            speedY: 4,
+            type: null,
+            element: createGameElement("ball")
+        };
+
+        // After score 20, balls get colors + powerups
+        if (score >= 20) {
+            const chosen = forceType || ballTypes[Math.floor(Math.random() * ballTypes.length)];
+            ball.type = chosen;
+            ball.element.style.background = chosen.color;
+        }
+
+        return ball;
+    }
+
+    function createGameElement(className) {
+        const el = document.createElement("div");
+        el.className = className;
+        document.body.appendChild(el);
+        return el;
+    }
+
+    function resetGame() {
+        balls.forEach(b => b.element.remove());
+        score = 0;
+        playerWidth = 100;
+        player.style.width = playerWidth + "px";
+        scoreText.textContent = "Score: " + score;
+        balls = [createBall()];
+        shieldActive = false;
+        ballSpeedMultiplier = 1;
+    }
+
+    // ----------------------------------------------------
+    // POWERUP EFFECTS
+    // ----------------------------------------------------
+    function applyPowerUp(type) {
+        if (!type) return;
+
+        switch (type.effect) {
+            case "bigPaddle":
+                playerWidth += 40;
+                player.style.width = playerWidth + "px";
+                break;
+
+            case "slowBalls":
+                ballSpeedMultiplier = 0.5;
+                setTimeout(() => ballSpeedMultiplier = 1, 5000);
+                break;
+
+            case "extraBall":
+                balls.push(createBall());
+                break;
+
+            case "shield":
+                shieldActive = true;
+                player.style.boxShadow = "0 0 20px purple";
+                setTimeout(() => {
+                    shieldActive = false;
+                    player.style.boxShadow = "none";
+                }, 5000);
+                break;
+        }
+    }
+
+    // ----------------------------------------------------
+    // MAIN GAME LOOP
+    // ----------------------------------------------------
+    function gameLoop() {
+        const playerRect = player.getBoundingClientRect();
+
+        for (let i = balls.length - 1; i >= 0; i--) {
+            let ball = balls[i];
+
+            ball.x += ball.speedX * ballSpeedMultiplier;
+            ball.y += ball.speedY * ballSpeedMultiplier;
+
+            if (ball.x <= 0 || ball.x >= window.innerWidth - 20) ball.speedX *= -1;
+            if (ball.y <= 0) ball.speedY *= -1;
+
+            // Paddle collision
+            if (
+                ball.y + 20 >= playerRect.top &&
+                ball.y + 20 <= playerRect.bottom &&
+                ball.x + 20 >= playerRect.left &&
+                ball.x <= playerRect.right &&
+                ball.speedY > 0
+            ) {
+                ball.speedY *= -1;
+                ball.speedY -= 0.2;
+
+                score++;
+                scoreText.textContent = "Score: " + score;
+
+                // Spawn more balls every 10 points
+                let targetBallCount = 1 + Math.floor(score / 10);
+                while (balls.length < targetBallCount) balls.push(createBall());
+
+                // Apply powerup if colored ball
+                applyPowerUp(ball.type);
+            }
+
+            // Lose condition
+            if (ball.y > window.innerHeight) {
+                if (!shieldActive) {
+                    alert("Game Over! Final Score: " + score);
+                    resetGame();
+                    break;
+                } else {
+                    ball.y = 0; // Shield saves you
+                }
+            }
+
+            ball.element.style.left = ball.x + "px";
+            ball.element.style.top = ball.y + "px";
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    resetGame();
+    gameLoop();
+</script>
+
+</body>
+</html>
